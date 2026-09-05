@@ -1,0 +1,89 @@
+name: Build MangaTUI for macOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-macos:
+    name: Build macOS App
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build manga-tui
+        run: cargo build --release
+
+      - name: Create app bundle
+        run: |
+          mkdir -p MangaTUI.app/Contents/MacOS
+          mkdir -p MangaTUI.app/Contents/Resources
+
+          cp target/release/manga-tui \
+             MangaTUI.app/Contents/MacOS/manga-tui
+
+          cat > MangaTUI.app/Contents/Info.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleName</key>
+              <string>MangaTUI</string>
+
+              <key>CFBundleDisplayName</key>
+              <string>MangaTUI</string>
+
+              <key>CFBundleIdentifier</key>
+              <string>com.mangatui.app</string>
+
+              <key>CFBundleVersion</key>
+              <string>1.0.0</string>
+
+              <key>CFBundleShortVersionString</key>
+              <string>1.0.0</string>
+
+              <key>CFBundleExecutable</key>
+              <string>launcher</string>
+
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+
+              <key>LSMinimumSystemVersion</key>
+              <string>12.0</string>
+          </dict>
+          </plist>
+          EOF
+
+          cat > MangaTUI.app/Contents/MacOS/launcher <<'EOF'
+          #!/bin/bash
+
+          APP_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+          osascript <<EOF
+          tell application "Terminal"
+              activate
+              do script "\"$APP_DIR/manga-tui\""
+          end tell
+          EOF
+          EOF
+
+          chmod +x MangaTUI.app/Contents/MacOS/launcher
+          chmod +x MangaTUI.app/Contents/MacOS/manga-tui
+
+      - name: Create ZIP
+        run: |
+          zip -r MangaTUI-macOS.zip MangaTUI.app
+
+      - name: Upload macOS app
+        uses: actions/upload-artifact@v7
+        with:
+          name: MangaTUI-macOS
+          path: MangaTUI-macOS.zip
